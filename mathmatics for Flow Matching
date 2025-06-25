@@ -1,0 +1,33 @@
+Flow Matching: Basic Concepts
+The Goal
+Given access to samples from a target distribution q (like a dataset of images), we want to build a model that can generate new samples from q.
+Mathematical Setup:
+
+Source distribution: p₀ = p (simple, known distribution - usually Gaussian noise)
+Target distribution: p₁ = q (complex, data distribution we want to learn)
+Goal: Learn how to transform samples X₀ ~ p into samples X₁ ~ q
+
+Key Idea: Probability Paths
+Instead of jumping directly from p to q, we create a smooth "path" of probability distributions:
+pt for t ∈ [0,1] where:
+
+p₀ = p (source)
+p₁ = q (target)
+pt smoothly interpolates between them
+
+Think of this like a movie: at time t=0 we have noise, at time t=1 we have data, and pt shows us what the distribution looks like at intermediate times.
+The Flow
+A flow ψt is a smooth transformation that moves points along this path:
+
+ψt(x): takes a point x and shows where it should be at time t
+ψ₀(x) = x (starts where it began)
+If X₀ ~ p, then Xt = ψt(X₀) ~ pt
+
+The Velocity Field
+Instead of learning the flow ψt directly, we learn a velocity field ut(x):
+
+ut(x) tells us "how fast and in what direction should point x move at time t"
+This is like learning the "speed and direction" at each point in space and time
+The flow satisfies: dψt(x)/dt = ut(ψt(x))
+
+This is much easier to learn than the full transformation!
