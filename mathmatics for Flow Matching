@@ -1,3 +1,7 @@
+PART 1
+
+2 Quick tour and key concepts
+
 Flow Matching: Basic Concepts
 The Goal
 Given access to samples from a target distribution q (like a dataset of images), we want to build a model that can generate new samples from q.
@@ -31,3 +35,254 @@ This is like learning the "speed and direction" at each point in space and time
 The flow satisfies: dψt(x)/dt = ut(ψt(x))
 
 This is much easier to learn than the full transformation!
+
+
+Flow Matching (FM) is a framework for training generative models that can transform samples from a simple source distribution (like random noise) into samples from a complex target distribution (like images or text).
+
+Now let's dive into the first mathematical formula from the document. The key equation that defines how a velocity field generates a probability path:
+
+Formula 1: Flow Definition (Equation 2.1)
+Xt := ψt(X₀) ~ pt for X₀ ~ p₀
+
+What this means:
+
+Start with a random sample X₀ from source distribution p₀
+Apply the flow transformation ψt to get Xt = ψt(X₀)
+The result Xt follows the probability distribution pt
+
+Simple Example:
+Imagine you have:
+
+X₀ ~ N(0,1) (standard Gaussian noise)
+You want X₁ ~ "distribution of cat images"
+
+The flow ψt gradually transforms the Gaussian noise into a cat image. At t=0.5, ψ₀.₅(X₀) might look like a blurry shape that's halfway between noise and a cat.
+
+
+
+
+Formula 2: The ODE that defines the flow (Equation 3.19)
+
+d/dt ψt(x) = ut(ψt(x))    (flow ODE)
+ψ0(x) = x                 (initial condition)
+
+What this means:
+
+This is a differential equation that tells us how the flow ψt evolves over time
+d/dt ψt(x) is the "instantaneous rate of change" of the flow at time t
+ut(ψt(x)) is the velocity field evaluated at the current position
+The initial condition says "at time 0, every point stays where it started"
+
+Simple Example:
+Think of a particle moving in space:
+
+ψt(x) = position of the particle at time t (if it started at position x)
+ut(position) = velocity vector at that position
+The ODE says: "velocity = rate of change of position"
+
+Concrete 1D Example:
+Let's say we want to move from a point at x=0 to x=1 in time t∈[0,1]:
+
+A simple velocity field: ut(x) = 1 (constant velocity)
+Solving the ODE: ψt(x) = x + t
+Check: ψ0(0) = 0, ψ1(0) = 1 ✓
+
+Formula 3: Probability Path Construction (Equation 2.2)
+
+pt(x) = ∫ pt|1(x|x1)q(x1)dx1
+where pt|1(x|x1) = N(x|tx1, (1-t)²I)
+
+What this means:
+
+Instead of constructing pt directly, we build it from simpler "conditional" paths
+pt|1(x|x1) = "probability of being at x at time t, given we want to end up at x1"
+q(x1) = probability density of target data point x1
+We average over all possible target points x1
+
+Why this works:
+
+Each conditional path pt|1(x|x1) is a simple Gaussian that starts at noise and ends at a specific data point x1
+The full path pt is a mixture of all these simple paths, weighted by how likely each data point is
+
+Simple 1D Example:
+
+Say our target data q has two points: x1=2 (probability 0.7) and x1=8 (probability 0.3)
+At t=0.5: pt|1(x|2) = N(x|1, 0.25) and pt|1(x|8) = N(x|4, 0.25)
+The full distribution: pt(x) = 0.7×N(x|1, 0.25) + 0.3×N(x|4, 0.25)
+
+This is a mixture of two Gaussians, one centered at 1, one at 4.
+
+Ultra-Simple 1D Example:
+
+Let's say our target data q has just ONE point: x1 = 5
+At different times:
+
+t=0: pt|1(x|5) = N(x | 0×5, 1²) = N(x | 0, 1) → centered at 0 (noise)
+t=0.5: pt|1(x|5) = N(x | 0.5×5, 0.5²) = N(x | 2.5, 0.25) → centered at 2.5
+t=1: pt|1(x|5) = N(x | 1×5, 0²) = δ(x-5) → exactly at point 5
+
+Since we only have one data point, pt(x) = pt|1(x|5).
+Key insight: The formula pt|1(x|x1) = N(x|tx1, (1-t)²I) creates a Gaussian that:
+
+Starts at 0 when t=0
+Moves toward x1 as t increases
+Arrives exactly at x1 when t=1
+Gets narrower (more certain) as t approaches 1
+
+Formula 4: The Random Variable Construction (Equation 2.3)
+Xt = tX1 + (1-t)X0 ~ pt
+
+What this means:
+
+This is a different way to think about the same probability path
+Instead of describing pt with integrals, we describe it through random variables
+Xt is a linear interpolation between X0 (noise) and X1 (data)
+
+Breaking it down:
+
+X0 ~ p (source distribution, usually noise)
+X1 ~ q (target distribution, data)
+Xt = (1-t)X0 + tX1 (weighted average)
+
+Simple Example:
+
+At t=0: Xt = 1×X0 + 0×X1 = X0 (pure noise)
+At t=1: Xt = 0×X0 + 1×X1 = X1 (pure data)
+At t=0.5: Xt = 0.5×X0 + 0.5×X1 (50% noise, 50% data)
+
+Concrete Numbers:
+If X0 = [1, 2] (noise sample) and X1 = [6, 8] (data sample):
+
+At t=0.3: Xt = 0.7×[1,2] + 0.3×[6,8] = [0.7+1.8, 1.4+2.4] = [2.5, 3.8]
+
+Key Connection:
+This formula (2.3) is actually the same as formula (2.2)! The conditional path pt|1(x|x1) = N(x|tx1, (1-t)²I) describes exactly the distribution you get when you do this linear interpolation.
+
+
+
+Formula 5: The Flow Matching Loss (Equation 2.4)
+
+L_FM(θ) = E_{t,Xt} [||u_t^θ(Xt) - ut(Xt)||²]
+where t ~ U[0,1] and Xt ~ pt
+
+What this means:
+
+This is the loss function we use to train our neural network u_t^θ
+u_t^θ(Xt) = what our neural network predicts the velocity should be
+ut(Xt) = what the true velocity actually is
+We want to minimize the squared difference between them
+
+Breaking it down:
+
+θ = parameters of our neural network
+t ~ U[0,1] = sample time uniformly between 0 and 1
+Xt ~ pt = sample a point from the probability distribution at time t
+||·||² = squared L2 norm (squared distance)
+E[·] = expectation (average over many samples)
+
+Simple Analogy:
+Think of learning to drive a car:
+
+ut(Xt) = "correct steering direction at position Xt and time t"
+u_t^θ(Xt) = "what our AI driver thinks the steering should be"
+Loss = how far off our AI driver is from the correct steering
+
+The Problem:
+We don't actually know the true velocity ut(Xt)! This is what makes the problem hard.
+
+
+
+
+Formula 6: The Conditional Velocity Field (Equation 2.6)
+
+ut(x|x1) = (x1 - x)/(1 - t)
+
+What this means:
+
+This is the velocity for the conditional path pt|1(x|x1)
+"If I'm at position x at time t, and I want to reach x1 at time t=1, what velocity do I need?"
+The answer: point toward x1, with speed that gets me there in the remaining time
+
+Breaking it down:
+
+x1 - x = direction vector (points from current position toward target)
+1 - t = remaining time
+Velocity = direction/time = how fast to move in that direction
+
+Simple Example:
+
+Current position: x = [2, 3]
+Target: x1 = [6, 7]
+Current time: t = 0.5 (remaining time = 0.5)
+
+ut(x|x1) = ([6,7] - [2,3])/(1 - 0.5) = [4,4]/0.5 = [8,8]
+
+So we need velocity [8,8] to reach the target in the remaining 0.5 time units.
+Check: Starting at [2,3] with velocity [8,8] for 0.5 time units:
+Final position = [2,3] + 0.5×[8,8] = [2,3] + [4,4] = [6,7] ✓
+This conditional velocity is much easier to compute than the full velocity ut(x)!
+
+
+Deriving the Conditional Velocity Field
+What We Want to Derive
+
+ut(x|x1) = (x1 - x)/(1 - t)
+
+Starting Point: The Conditional Path
+From Formula 2.5, we know:
+Xt|1 = tx1 + (1-t)X0
+
+where X0 ~ p (noise) and we want to end up at x1.
+
+Step 1: Take the Time Derivative
+The velocity is the rate of change with respect to time:
+
+ut(x|x1) = d/dt [Xt|1]
+Let's compute this derivative:
+
+d/dt [Xt|1] = d/dt [tx1 + (1-t)X0]
+
+Step 2: Apply Derivative Rules
+Using the derivative rules:
+d/dt [tx1] = x1 (since x1 is constant, t is the variable)
+d/dt [(1-t)X0] = -X0 (since X0 is constant)
+So:
+d/dt [Xt|1] = x1 - X0
+
+Step 3: Express X0 in Terms of Current Position
+We know that at time t:
+Xt|1 = tx1 + (1-t)X0
+Solving for X0:
+(1-t)X0 = Xt|1 - tx1
+X0 = (Xt|1 - tx1)/(1-t)
+
+Step 4: Substitute Back
+Now substitute this expression for X0:
+ut(x|x1) = x1 - X0
+         = x1 - (Xt|1 - tx1)/(1-t)
+         = x1 - (Xt|1 - tx1)/(1-t)
+
+Step 5: Simplify
+Let's call the current position x = Xt|1:
+ut(x|x1) = x1 - (x - tx1)/(1-t)
+         = x1 - x/(1-t) + tx1/(1-t)
+         = x1(1 + t/(1-t)) - x/(1-t)
+         = x1((1-t+t)/(1-t)) - x/(1-t)
+         = x1(1/(1-t)) - x/(1-t)
+         = (x1 - x)/(1-t)
+
+Verification: Does This Make Sense?
+Physical Interpretation:
+
+Current position: x
+Target position: x1
+Distance to travel: x1 - x
+Time remaining: 1 - t
+Required velocity: distance/time = (x1 - x)/(1 - t)
+
+Boundary Check:
+
+At t → 1: ut(x|x1) → ∞ (need infinite speed to reach target instantly)
+At t = 0: ut(x|x1) = (x1 - x)/1 = x1 - x (need to travel full distance in full time)
+
+This confirms our derivation is correct!
