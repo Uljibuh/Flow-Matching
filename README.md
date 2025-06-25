@@ -1,2 +1,5 @@
 # Flow-Matching
-understand Flow Matching from first principle, math and code implementation.
+Understand flow matching from first principles, mathematics, and code implementation.
+
+Resource: FlowMatchingGuideandCode
+
