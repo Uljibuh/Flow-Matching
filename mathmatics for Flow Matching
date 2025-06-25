@@ -286,3 +286,72 @@ At t → 1: ut(x|x1) → ∞ (need infinite speed to reach target instantly)
 At t = 0: ut(x|x1) = (x1 - x)/1 = x1 - x (need to travel full distance in full time)
 
 This confirms our derivation is correct!
+
+
+
+Formula 7: The Conditional Flow Matching Loss (Equation 2.7)
+
+L_CFM(θ) = E_{t,Xt,X1} [||u_t^θ(Xt) - ut(Xt|X1)||²]
+where t ~ U[0,1], X0 ~ p, X1 ~ q
+
+What this means:
+
+This is the practical loss function we actually use for training
+Instead of the impossible-to-compute L_FM, we use this tractable version
+We condition on specific data samples X1 from our dataset
+
+Breaking it down:
+
+t ~ U[0,1] = sample random time
+X0 ~ p = sample from noise distribution
+X1 ~ q = sample from data distribution (actual data point from dataset)
+Xt = tX1 + (1-t)X0 = interpolated point (from Formula 2.3)
+ut(Xt|X1) = conditional velocity we just derived (Formula 6)
+
+Why this works:
+The document states something amazing in Equation 2.8:
+∇θL_FM(θ) = ∇θL_CFM(θ)
+This means: The gradients are identical! Training with L_CFM is exactly the same as training with L_FM, but L_CFM is actually computable.
+
+
+
+Formula 8: The Simplest Implementation (Equation 2.9)
+L^{OT,Gauss}_CFM(θ) = E_{t,X0,X1} [||u_t^θ(Xt) - (X1 - X0)||²]
+where t ~ U[0,1], X0 ~ N(0,I), X1 ~ q
+
+What this means:
+
+This is the final, practical loss function
+We plugged in ut(x|x1) = (x1-x)/(1-t) from Formula 6
+But wait - why is it (X1 - X0) instead of (X1 - Xt)/(1-t)?
+
+The derivation:
+Starting with ut(Xt|X1) = (X1 - Xt)/(1-t) and Xt = tX1 + (1-t)X0:
+ut(Xt|X1) = (X1 - Xt)/(1-t)
+          = (X1 - [tX1 + (1-t)X0])/(1-t)
+          = (X1 - tX1 - (1-t)X0)/(1-t)
+          = ((1-t)X1 - (1-t)X0)/(1-t)
+          = (1-t)(X1 - X0)/(1-t)
+          = X1 - X0
+
+
+imple Example:
+
+X0 = [1, 2] (noise sample)
+X1 = [5, 8] (data sample)
+Target velocity = [5, 8] - [1, 2] = [4, 6]
+This is independent of time t!
+
+Training procedure:
+
+Sample noise X0 ~ N(0,I)
+Sample data X1 from your dataset
+Sample time t ~ U[0,1]
+Compute Xt = tX1 + (1-t)X0
+Target velocity = X1 - X0
+Train network to predict this: minimize ||u_t^θ(Xt) - (X1 - X0)||²
+
+The beauty is that the target velocity X1 - X0 is super simple to compute!
+
+
+PART1 ENDs
